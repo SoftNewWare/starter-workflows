@@ -2,7 +2,6 @@ name: Update Confluence Page with Commits
 
 on:
   workflow_dispatch:  # Allow manual trigger
-
   pull_request:
     types: [closed]
     branches:
@@ -29,7 +28,8 @@ jobs:
         run: |
           echo "Generating HTML commit table rows..."
           REPO_NAME="${{ github.repository }}"
-          git log -n 5 --pretty=format:"<tr><td>$REPO_NAME</td><td>%h</td><td>%s</td><td>%ad</td></tr>" --date=iso > table_rows.html
+          AUTHOR_NAME="${{ github.actor }}"
+          git log -n 5 --pretty=format:"<tr><td></td><td>$REPO_NAME</td><td>%h</td><td>%s</td><td>$AUTHOR_NAME</td><td>%an</td><td>%ad</td></tr>" --date=iso > table_rows.html
 
       - name: Get current page content and version
         id: page
@@ -55,7 +55,7 @@ jobs:
             UPDATED_CONTENT=$(echo "$CONTENT" | sed "s|</table>|$NEW_ROWS</table>|")
           else
             echo "No table found. Creating new table..."
-            UPDATED_CONTENT="<table><tr><th>Module Name</th><th>Commit ID</th><th>Commit Message</th><th>Commit Date & Time</th></tr>$NEW_ROWS</table>"
+            UPDATED_CONTENT="<table><tr><th>Serial</th><th>Module Name</th><th>Commit ID</th><th>Commit Message</th><th>PR Merger</th><th>Commit Author</th><th>Commit Date & Time</th></tr>$NEW_ROWS</table>"
           fi
 
           JSON=$(jq -n \
