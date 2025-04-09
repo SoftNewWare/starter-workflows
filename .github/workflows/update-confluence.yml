@@ -21,13 +21,11 @@ jobs:
         run: |
           echo "Generating HTML commit table..."
           REPO_NAME="${{ github.repository }}"
-          echo "<table><tr><th>Module Name</th><th>Commit ID</th><th>Commit Message</th><th>Commit Date & Time</th></tr>" > table.html
-          git log -n 5 --pretty=format:"<tr><td>$REPO_NAME</td><td>%h</td><td>%s</td><td>%ad</td></tr>" --date=iso >> table.html
-          echo "</table>" >> table.html
-
-          # Convert table to escaped string for JSON
-          TABLE=$(jq -Rs '.' < table.html)
-          echo "table=$TABLE" >> $GITHUB_OUTPUT
+          {
+            echo "<table><tr><th>Module Name</th><th>Commit ID</th><th>Commit Message</th><th>Commit Date & Time</th></tr>"
+            git log -n 5 --pretty=format:"<tr><td>$REPO_NAME</td><td>%h</td><td>%s</td><td>%ad</td></tr>" --date=iso
+            echo "</table>"
+          } > table.html
 
       - name: Get current page version
         id: version
@@ -36,26 +34,39 @@ jobs:
             "$CONFLUENCE_URL/rest/api/content/$PAGE_ID?expand=version")
           VERSION=$(echo "$RESPONSE" | jq '.version.number')
           echo "version=$((VERSION + 1))" >> $GITHUB_OUTPUT
+
       - name: Update Confluence Page
         run: |
-          JSON_PAYLOAD=$(cat <<EOF
+          echo "Building JSON payload..."
+          
+          # Escape the HTML content
+          HTML=$(jq -Rs . < table.html)
+
+          JSON=$(cat <<EOF
           {
             "id": "$PAGE_ID",
             "type": "page",
-            "title": "Changelog Updates",
-            "space": { "key": "$SPACE_KEY" },
-            "version": { "number": $(($PAGE_VERSION + 1)) },
+            "title": "$PAGE_TITLE",
+            "space": {
+              "key": "$SPACE_KEY"
+            },
+            "version": {
+              "number": ${{ steps.version.outputs.version }}
+            },
             "body": {
               "storage": {
-                "value": "$TABLE_HTML",
+                "value": $HTML,
                 "representation": "storage"
               }
             }
           }
           EOF
-                )
-                echo "Updating Confluence page..."
-                curl -s -X PUT "$CONFLUENCE_URL/rest/api/content/$PAGE_ID" \
-                  -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
-                  -H "Content-Type: application/json" \
-                  -d "$JSON_PAYLOAD"
+          )
+
+          echo "$JSON" > payload.json
+
+          echo "Updating Confluence page..."
+          curl -s -X PUT "$CONFLUENCE_URL/rest/api/content/$PAGE_ID" \
+            -u "${{ secrets.CONFLUENCE_USERNAME }}:${{ secrets.CONFLUENCE_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data @"payload.json"
