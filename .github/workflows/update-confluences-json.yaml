@@ -1,4 +1,4 @@
-name: Update Confluence Page withJsons
+name: Update Confluence Page with Jsons
 
 on:
   workflow_dispatch:
