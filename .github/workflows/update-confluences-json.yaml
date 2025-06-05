@@ -20,7 +20,7 @@ jobs:
         id: read_json
         run: |
           # Read the file content as a single string (escaped)
-          CONTENT=$(jq -Rs '.' Pages/Test.json)
+          CONTENT=$(jq -Rs '.' pages/Test.json)
           echo "PAGE_CONTENT=$CONTENT" >> $GITHUB_ENV
 
       - name: Get current Confluence page info
