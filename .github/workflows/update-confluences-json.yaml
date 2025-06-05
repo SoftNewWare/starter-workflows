@@ -15,8 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CONFLUENCE_URL: https://airnewn.atlassian.net/wiki
-      SPACE_KEY: "ENG"
+      PAGE_ID: "13369346"
       PAGE_TITLE: "Json"
+      SPACE_KEY: "~7120201888c3feda8740dea868d9a13920847a"
 
     steps:
       - name: Checkout repo
