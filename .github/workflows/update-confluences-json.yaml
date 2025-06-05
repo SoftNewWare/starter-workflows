@@ -1,4 +1,4 @@
-name: Update Confluence Page WithJson
+name: Update Confluence Page with Commits
 
 on:
   workflow_dispatch:
@@ -7,8 +7,7 @@ on:
     types: [closed]
     branches:
       - main
-    paths:
-      - '**'
+
 jobs:
   update-confluence:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
@@ -20,27 +19,13 @@ jobs:
       SPACE_KEY: "~7120201888c3feda8740dea868d9a13920847a"
 
     steps:
-      - name: Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Get Page ID from title
-        id: get_page
+      - name: Generate commit table rows
         run: |
-          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CONFLUENCE_PAT }}" \
-            "$CONFLUENCE_URL/rest/api/content?title=${PAGE_TITLE// /%20}&spaceKey=$SPACE_KEY")
-
-          PAGE_ID=$(echo "$RESPONSE" | jq -r '.results[0].id')
-
-          if [ "$PAGE_ID" = "null" ] || [ -z "$PAGE_ID" ]; then
-            echo "Page not found. You must manually create the page first."
-            exit 1
-          fi
-
-          echo "PAGE_ID=$PAGE_ID" >> $GITHUB_ENV
-
-      - name: Append commit details to Confluence page
-        run: |
-          HEADER="<table><tr><th>Serial</th><th>Module Name</th><th>Commit ID</th><th>Commit Message</th><th>Pull Request</th><th>Author</th><th>Date</th></tr>"
+          echo "Preparing commit table..."
+          HEADER="<table><tr><th>Serial</th><th>Module</th><th>Commit ID</th><th>Message</th><th>Pull Request</th><th>Author</th><th>Date</th></tr>"
           NEW_ROWS=""
           SERIAL=1
 
@@ -49,23 +34,29 @@ jobs:
           while read -r LINE; do
             COMMIT_ID=$(echo "$LINE" | cut -d '|' -f1)
             MESSAGE=$(echo "$LINE" | cut -d '|' -f2)
-            PR_LINK="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
             AUTHOR=$(echo "$LINE" | cut -d '|' -f3)
             DATE=$(echo "$LINE" | cut -d '|' -f4)
+            PR_LINK="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
             NEW_ROWS+="<tr><td>$SERIAL</td><td>${{ github.repository }}</td><td>$COMMIT_ID</td><td>$MESSAGE</td><td><a href='$PR_LINK'>$PR_LINK</a></td><td>$AUTHOR</td><td>$DATE</td></tr>"
             SERIAL=$((SERIAL + 1))
           done < <(git log --pretty=format:"%h|%s|%an|%ad" --date=iso \
             ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.merge_commit_sha }})
 
-          TABLE="$HEADER$NEW_ROWS</table>"
+          echo "$HEADER$NEW_ROWS</table>" > table.html
 
+      - name: Get current page content
+        id: get_page
+        run: |
           RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CONFLUENCE_PAT }}" \
             "$CONFLUENCE_URL/rest/api/content/$PAGE_ID?expand=body.storage,version")
 
-          OLD_CONTENT=$(echo "$RESPONSE" | jq -r '.body.storage.value')
-          VERSION=$(echo "$RESPONSE" | jq '.version.number')
+          echo "$RESPONSE" > page.json
+          echo "OLD_CONTENT=$(jq -r '.body.storage.value' page.json)" >> $GITHUB_ENV
+          echo "VERSION=$(jq '.version.number' page.json)" >> $GITHUB_ENV
 
-          FINAL_CONTENT="$OLD_CONTENT<br/><br/>$TABLE"
+      - name: Update Confluence page
+        run: |
+          FINAL_CONTENT="${OLD_CONTENT}<p><br/></p>$(cat table.html)"
 
           JSON=$(jq -n \
             --arg id "$PAGE_ID" \
