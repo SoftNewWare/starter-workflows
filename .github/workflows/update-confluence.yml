@@ -1,94 +1,78 @@
 name: Update Confluence Page with Commits
 
 on:
-  workflow_dispatch:  # Allow manual trigger
-
-  pull_request:
-    types: [closed]
-    branches:
-      - main
-    paths:
-      - '**'
+  workflow_dispatch:
 
 jobs:
   update-confluence:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     env:
       CONFLUENCE_URL: https://airnewn.atlassian.net/wiki
-      SPACE_KEY: "ENG"
+      PAGE_ID: 98308
+      SPACE_KEY: "~7120201888c3feda8740dea868d9a13920847a"
       PAGE_TITLE: "Changelog Updates"
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Get Page ID from title
-        id: get_page
+      - name: Generate commit table HTML
+        id: generate
         run: |
-          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CONFLUENCE_PAT }}" \
-            "$CONFLUENCE_URL/rest/api/content?title=${PAGE_TITLE// /%20}&spaceKey=$SPACE_KEY")
+          echo "Generating commit table..."
+          REPO="${{ github.repository }}"
+          {
+            echo "<table><tr><th>Module Name</th><th>Commit ID</th><th>Commit Message</th><th>Commit Date & Time</th></tr>"
+            git log -n 5 --pretty=format:"<tr><td>$REPO</td><td>%h</td><td>%s</td><td>%ad</td></tr>" --date=iso
+            echo "</table>"
+          } > table.html
 
-          PAGE_ID=$(echo "$RESPONSE" | jq -r '.results[0].id')
+          TABLE_HTML=$(jq -Rs < table.html)
+          echo "TABLE_HTML=${TABLE_HTML}" >> $GITHUB_ENV
 
-          if [ "$PAGE_ID" = "null" ] || [ -z "$PAGE_ID" ]; then
-            echo "Page not found. You must manually create the page first."
-            exit 1
-          fi
-
-          echo "PAGE_ID=$PAGE_ID" >> $GITHUB_ENV
-
-      - name: Append commit details to Confluence page
+      - name: Get current Confluence page version
+        id: get-version
         run: |
-          NEW_ROWS=""
-          SERIAL=1
-
-          while read -r LINE; do
-            COMMIT_ID=$(echo "$LINE" | cut -d '|' -f1)
-            MESSAGE=$(echo "$LINE" | cut -d '|' -f2)
-            PR_LINK="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
-            AUTHOR=$(echo "$LINE" | cut -d '|' -f3)
-            DATE=$(echo "$LINE" | cut -d '|' -f4)
-            NEW_ROWS+="| $SERIAL | ${{ github.repository }} | $COMMIT_ID | $MESSAGE | [$PR_LINK]($PR_LINK) | $AUTHOR | $DATE |"
-            SERIAL=$((SERIAL + 1))
-          done < <(git log -n 5 --pretty=format:"%h|%s|%an|%ad" --date=iso)
-
-          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CONFLUENCE_PAT }}" \
-            "$CONFLUENCE_URL/rest/api/content/$PAGE_ID?expand=body.storage,version")
-
-          OLD_CONTENT=$(echo "$RESPONSE" | jq -r '.body.storage.value')
+          echo "Fetching current page version..."
+          RESPONSE=$(curl -s -u "${{ secrets.CONFLUENCE_USERNAME }}:${{ secrets.CONFLUENCE_API_TOKEN }}" \
+            "$CONFLUENCE_URL/rest/api/content/$PAGE_ID?expand=version")
           VERSION=$(echo "$RESPONSE" | jq '.version.number')
+          echo "PAGE_VERSION=$((VERSION + 1))" >> $GITHUB_ENV
 
-          if ! echo "$OLD_CONTENT" | grep -q "|| Serial ||"; then
-            HEADER="|| Serial || Module Name || Commit ID || Commit Message || Pull Request || Commit Author || Commit Date & Time ||"
-            FINAL_CONTENT="$HEADER"$'\n'"$NEW_ROWS"
-          else
-            FINAL_CONTENT="$OLD_CONTENT"$'\n'"$NEW_ROWS"
-          fi
+      - name: Update Confluence page
+        run: |
+          echo "Preparing payload..."
 
-          JSON=$(jq -n \
-            --arg id "$PAGE_ID" \
-            --arg title "$PAGE_TITLE" \
-            --arg space_key "$SPACE_KEY" \
-            --arg version "$((VERSION + 1))" \
-            --arg value "$FINAL_CONTENT" \
-            '{
-              id: $id,
-              type: "page",
-              title: $title,
-              space: { key: $space_key },
-              version: { number: ($version | tonumber) },
-              body: {
-                storage: {
-                  value: $value,
-                  representation: "wiki"
-                }
+          # Build escaped HTML content from file (json-safe string)
+          HTML=$(jq -Rs . < table.html)
+
+          JSON=$(cat <<EOF
+          {
+            "id": "$PAGE_ID",
+            "type": "page",
+            "title": "$PAGE_TITLE",
+            "space": {
+              "key": "$SPACE_KEY"
+            },
+            "version": {
+              "number": $PAGE_VERSION
+            },
+            "body": {
+              "storage": {
+            "value": $HTML,
+            "representation": "storage"
               }
-            }')
+            }
+          }
+          EOF
+          )
 
           echo "$JSON" > payload.json
 
+          echo "Sending update request..."
           curl -s -X PUT "$CONFLUENCE_URL/rest/api/content/$PAGE_ID" \
-            -H "Authorization: Bearer ${{ secrets.CONFLUENCE_PAT }}" \
-            -H "Content-Type: application/json" \
-            -d @payload.json
+              -u "${{ secrets.CONFLUENCE_USERNAME }}:${{ secrets.CONFLUENCE_API_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              --data @"payload.json"
+
+          echo "$JSON" > payload.json

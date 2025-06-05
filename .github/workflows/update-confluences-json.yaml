@@ -1,5 +1,4 @@
 name: Update Confluence Page withJsons
-
 on:
   workflow_dispatch:
 
@@ -47,7 +46,7 @@ jobs:
       - name: Get current page content
         id: get_page
         run: |
-          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CONFLUENCE_PAT }}" \
+          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CONFLUENCE_API_TOKEN }}" \
             "$CONFLUENCE_URL/rest/api/content/$PAGE_ID?expand=body.storage,version")
 
           echo "$RESPONSE" > page.json
@@ -81,6 +80,6 @@ jobs:
           echo "$JSON" > payload.json
 
           curl -s -X PUT "$CONFLUENCE_URL/rest/api/content/$PAGE_ID" \
-            -H "Authorization: Bearer ${{ secrets.CONFLUENCE_PAT }}" \
+            -H "Authorization: Bearer ${{ secrets.CONFLUENCE_API_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d @payload.json
