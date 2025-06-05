@@ -26,7 +26,7 @@ jobs:
       - name: Get Page ID from title
         id: get_page
         run: |
-          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CONFLUENCE_API_TOKEN }}" \
+          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CONFLUENCE_PAT }}" \
             "$CONFLUENCE_URL/rest/api/content?title=${PAGE_TITLE// /%20}&spaceKey=$SPACE_KEY")
 
           PAGE_ID=$(echo "$RESPONSE" | jq -r '.results[0].id')
@@ -49,11 +49,12 @@ jobs:
             PR_LINK="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
             AUTHOR=$(echo "$LINE" | cut -d '|' -f3)
             DATE=$(echo "$LINE" | cut -d '|' -f4)
-            NEW_ROWS+="| $SERIAL | ${{ github.repository }} | $COMMIT_ID | $MESSAGE | [$PR_LINK]($PR_LINK) | $AUTHOR | $DATE |"
+            NEW_ROWS+="| $SERIAL | ${{ github.repository }} | $COMMIT_ID | $MESSAGE | [$PR_LINK]($PR_LINK) | $AUTHOR | $DATE |
+"
             SERIAL=$((SERIAL + 1))
           done < <(git log -n 5 --pretty=format:"%h|%s|%an|%ad" --date=iso)
 
-          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CONFLUENCE_API_TOKEN }}" \
+          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CONFLUENCE_PAT }}" \
             "$CONFLUENCE_URL/rest/api/content/$PAGE_ID?expand=body.storage,version")
 
           OLD_CONTENT=$(echo "$RESPONSE" | jq -r '.body.storage.value')
@@ -89,6 +90,6 @@ jobs:
           echo "$JSON" > payload.json
 
           curl -s -X PUT "$CONFLUENCE_URL/rest/api/content/$PAGE_ID" \
-            -H "Authorization: Bearer ${{ secrets.CONFLUENCE_API_TOKEN }}" \
+            -H "Authorization: Bearer ${{ secrets.CONFLUENCE_PAT }}" \
             -H "Content-Type: application/json" \
             -d @payload.json
