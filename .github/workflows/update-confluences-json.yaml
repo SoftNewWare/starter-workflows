@@ -1,49 +1,58 @@
-name: Update Confluence Page Simple (Basic Auth)
+name: Update Confluence Page from JSON File
 
 on:
   workflow_dispatch:
-  pull_request:
-    types: [closed]
-    branches:
-      - main
 
 jobs:
   update-confluence:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     env:
       CONFLUENCE_URL: https://airnewn.atlassian.net/wiki
       PAGE_ID: "13369346"
       PAGE_TITLE: "Json"
       SPACE_KEY: "~7120201888c3feda8740dea868d9a13920847a"
-      CONFLUENCE_USERNAME: ${{ secrets.CONFLUENCE_USERNAME }}
-      CONFLUENCE_API_TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
-
+      
     steps:
-      - name: Get current page content and version
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Read JSON content from file
+        id: read_json
+        run: |
+          # Read the file content as a single string (escaped)
+          CONTENT=$(jq -Rs '.' Pages/Test.json)
+          echo "PAGE_CONTENT=$CONTENT" >> $GITHUB_ENV
+
+      - name: Get current Confluence page info
         id: get_page
         run: |
-          RESPONSE=$(curl -s -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
+          RESPONSE=$(curl -s -u "${{ secrets.CONFLUENCE_USERNAME }}:${{ secrets.CONFLUENCE_API_TOKEN }}" \
             "$CONFLUENCE_URL/rest/api/content/$PAGE_ID?expand=body.storage,version")
-
           echo "$RESPONSE" > page.json
+
+          # Extract current content and version
           OLD_CONTENT=$(jq -r '.body.storage.value' page.json)
           VERSION=$(jq '.version.number' page.json)
-          echo "OLD_CONTENT<<EOF" >> $GITHUB_ENV
-          echo "$OLD_CONTENT" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+
+          echo "OLD_CONTENT=$OLD_CONTENT" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Update Confluence page content
+      - name: Prepare new content and payload
+        id: prepare_payload
         run: |
-          FINAL_CONTENT="${OLD_CONTENT}<p>Updated from GitHub Actions on $(date)</p>"
+          # You can replace or append. Here, let's replace content fully with JSON file content:
+          NEW_CONTENT=$(echo "$PAGE_CONTENT" | jq -r '.')  # unescape JSON string to raw string
 
-          JSON=$(jq -n \
+          # Or to append:
+          # NEW_CONTENT="${OLD_CONTENT}<p><br/></p>${PAGE_CONTENT}"
+
+          # Build JSON payload for Confluence
+          PAYLOAD=$(jq -n \
             --arg id "$PAGE_ID" \
             --arg title "$PAGE_TITLE" \
             --arg space_key "$SPACE_KEY" \
             --argjson version $((VERSION + 1)) \
-            --arg value "$FINAL_CONTENT" \
+            --arg value "$NEW_CONTENT" \
             '{
               id: $id,
               type: "page",
@@ -58,9 +67,11 @@ jobs:
               }
             }')
 
-          echo "$JSON" > payload.json
+          echo "$PAYLOAD" > payload.json
 
+      - name: Update Confluence page
+        run: |
           curl -s -X PUT "$CONFLUENCE_URL/rest/api/content/$PAGE_ID" \
-            -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
+            -u "${{ secrets.CONFLUENCE_USERNAME }}:${{ secrets.CONFLUENCE_API_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d @payload.json
