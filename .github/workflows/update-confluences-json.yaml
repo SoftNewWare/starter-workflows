@@ -17,7 +17,7 @@ jobs:
     env:
       CONFLUENCE_URL: https://airnewn.atlassian.net/wiki
       SPACE_KEY: "ENG"
-      PAGE_TITLE: "Changelog Updates"
+      PAGE_TITLE: "Json"
 
     steps:
       - name: Checkout repo
