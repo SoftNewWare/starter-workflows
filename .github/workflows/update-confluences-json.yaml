@@ -1,4 +1,4 @@
-name: Update Confluence Page with Commits
+name: Update Confluence Page with Commits Json
 
 on:
   workflow_dispatch:
