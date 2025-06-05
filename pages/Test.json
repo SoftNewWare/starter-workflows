@@ -1,0 +1,28 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Alice Johnson",
+      "email": "alice.johnson@example.com",
+      "age": 29,
+      "isActive": true,
+      "roles": ["admin", "editor"]
+    },
+    {
+      "id": 2,
+      "name": "Bob Smith",
+      "email": "bob.smith@example.com",
+      "age": 34,
+      "isActive": false,
+      "roles": ["viewer"]
+    },
+    {
+      "id": 3,
+      "name": "Charlie Brown",
+      "email": "charlie.brown@example.com",
+      "age": 41,
+      "isActive": true,
+      "roles": ["editor", "viewer"]
+    }
+  ]
+}
