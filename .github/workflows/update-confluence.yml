@@ -26,7 +26,7 @@ jobs:
       - name: Get Page ID from title
         id: get_page
         run: |
-          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CONFLUENCE_PAT }}" \
+          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CONFLUENCE_API_TOKEN }}" \
             "$CONFLUENCE_URL/rest/api/content?title=${PAGE_TITLE// /%20}&spaceKey=$SPACE_KEY")
 
           PAGE_ID=$(echo "$RESPONSE" | jq -r '.results[0].id')
@@ -53,7 +53,7 @@ jobs:
             SERIAL=$((SERIAL + 1))
           done < <(git log -n 5 --pretty=format:"%h|%s|%an|%ad" --date=iso)
 
-          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CONFLUENCE_PAT }}" \
+          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CONFLUENCE_API_TOKEN }}" \
             "$CONFLUENCE_URL/rest/api/content/$PAGE_ID?expand=body.storage,version")
 
           OLD_CONTENT=$(echo "$RESPONSE" | jq -r '.body.storage.value')
@@ -89,6 +89,6 @@ jobs:
           echo "$JSON" > payload.json
 
           curl -s -X PUT "$CONFLUENCE_URL/rest/api/content/$PAGE_ID" \
-            -H "Authorization: Bearer ${{ secrets.CONFLUENCE_PAT }}" \
+            -H "Authorization: Bearer ${{ secrets.CONFLUENCE_API_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d @payload.json
