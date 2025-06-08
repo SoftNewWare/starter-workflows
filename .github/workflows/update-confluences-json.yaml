@@ -15,13 +15,21 @@ jobs:
       SPACE_KEY: "~7120201888c3feda8740dea868d9a13920847a"
       
     steps:
-      - name: Checkout repo
+      - name: Checkout main branch
         uses: actions/checkout@v3
+        with:
+          ref: main
 
-      - name: Read JSON content from file
+      - name: Debug file presence
+        run: |
+          echo "Listing all files"
+          find . -type f
+          echo "Contents of pages directory:"
+          ls -l pages
+
+      - name: Read JSON file content
         id: read_json
         run: |
-          # Read the file content as a single string (escaped)
           CONTENT=$(jq -Rs '.' pages/Test.json)
           echo "PAGE_CONTENT=$CONTENT" >> $GITHUB_ENV
 
