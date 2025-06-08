@@ -66,7 +66,13 @@ jobs:
           OLD_CONTENT=$(jq -r '.body.storage.value' page.json)
           VERSION=$(jq '.version.number' page.json)
 
-          echo "OLD_CONTENT=$OLD_CONTENT" >> $GITHUB_ENV
+          # Store OLD_CONTENT safely as multiline
+          {
+            echo "OLD_CONTENT<<EOF"
+            echo "$OLD_CONTENT"
+            echo "EOF"
+          } >> $GITHUB_ENV
+
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Prepare new content and payload
