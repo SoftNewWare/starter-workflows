@@ -51,6 +51,28 @@ jobs:
 
           TABLE+="</table>"
 
+          # Save to a file instead of env
+          echo "$TABLE" > table.html
+
+        id: json_to_html
+        run: |
+          JSON_PATH="pages/Test.json"
+
+          HEADERS=$(jq -r '.users[0] | keys_unsorted | @tsv' "$JSON_PATH")
+
+          TABLE="<table><tr>"
+          for header in $HEADERS; do
+            TABLE+="<th>$header</th>"
+          done
+          TABLE+="</tr>"
+
+          jq -r '.users[] | [.id, .name, .email, .age, .isActive, (.roles | join(", "))] | @tsv' "$JSON_PATH" | \
+          while IFS=$'\t' read -r id name email age active roles; do
+            TABLE+="<tr><td>$id</td><td>$name</td><td>$email</td><td>$age</td><td>$active</td><td>$roles</td></tr>"
+          done
+
+          TABLE+="</table>"
+
           echo "PAGE_CONTENT<<EOF" >> $GITHUB_ENV
           echo "$TABLE" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
