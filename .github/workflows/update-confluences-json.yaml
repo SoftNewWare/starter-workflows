@@ -32,28 +32,16 @@ jobs:
           echo "PAGE_CONTENT=$CONTENT" >> $GITHUB_ENV
 
       - name: Convert JSON to HTML table
-        id: json_to_html
+        id: json_to_table
         run: |
-          JSON_PATH="pages/Test.json"
-
-          HEADERS=$(jq -r '.users[0] | keys_unsorted | @tsv' "$JSON_PATH")
-
-          TABLE="<table><tr>"
-          for header in $HEADERS; do
-            TABLE+="<th>$header</th>"
-          done
-          TABLE+="</tr>"
-
-          jq -r '.users[] | [.id, .name, .email, .age, .isActive, (.roles | join(", "))] | @tsv' "$JSON_PATH" | \
-          while IFS=$'\t' read -r id name email age active roles; do
-            TABLE+="<tr><td>$id</td><td>$name</td><td>$email</td><td>$age</td><td>$active</td><td>$roles</td></tr>"
-          done
-
-          TABLE+="</table>"
-
-          # Save to a file instead of env
-          echo "$TABLE" > table.html
-
+          echo "<table><tr><th>ID</th><th>Name</th><th>Email</th><th>Age</th><th>Active</th><th>Roles</th></tr>" > table.html
+          jq -r '.users[] | "<tr><td>\(.id)</td><td>\(.name)</td><td>\(.email)</td><td>\(.age)</td><td>\(.isActive)</td><td>\(.roles | join(\", \"))</td></tr>"' pages/Test.json >> table.html
+          echo "</table>" >> table.html
+          {
+            echo "TABLE_HTML<<EOF"
+            cat table.html
+            echo "EOF"
+          } >> $GITHUB_ENV
 
       - name: Get current Confluence page info
         id: get_page
@@ -62,26 +50,17 @@ jobs:
             "$CONFLUENCE_URL/rest/api/content/$PAGE_ID?expand=body.storage,version")
           echo "$RESPONSE" > page.json
 
-          # Extract current content and version
           OLD_CONTENT=$(jq -r '.body.storage.value' page.json)
           VERSION=$(jq '.version.number' page.json)
 
-          # Store OLD_CONTENT safely as multiline
-          {
-            echo "OLD_CONTENT<<EOF"
-            echo "$OLD_CONTENT"
-            echo "EOF"
-          } >> $GITHUB_ENV
-
+          echo "OLD_CONTENT=$OLD_CONTENT" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Prepare new content and payload
         id: prepare_payload
         run: |
-          # You can replace or append. Here, let's replace content fully with table:
-          NEW_CONTENT="$PAGE_CONTENT"
+          NEW_CONTENT="${TABLE_HTML}"
 
-          # Build JSON payload for Confluence
           PAYLOAD=$(jq -n \
             --arg id "$PAGE_ID" \
             --arg title "$PAGE_TITLE" \
@@ -111,4 +90,3 @@ jobs:
             -H "Content-Type: application/json" \
             -d @payload.json
 
-  
