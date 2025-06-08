@@ -3,8 +3,6 @@ name: Update Confluence Page from JSON File
 on:
   workflow_dispatch:
 
-
-
 jobs:
   update-confluence:
     runs-on: ubuntu-latest
@@ -33,6 +31,30 @@ jobs:
           CONTENT=$(jq -Rs '.' pages/Test.json)
           echo "PAGE_CONTENT=$CONTENT" >> $GITHUB_ENV
 
+      - name: Convert JSON to HTML table
+        id: json_to_html
+        run: |
+          JSON_PATH="pages/Test.json"
+
+          HEADERS=$(jq -r '.users[0] | keys_unsorted | @tsv' "$JSON_PATH")
+
+          TABLE="<table><tr>"
+          for header in $HEADERS; do
+            TABLE+="<th>$header</th>"
+          done
+          TABLE+="</tr>"
+
+          jq -r '.users[] | [.id, .name, .email, .age, .isActive, (.roles | join(", "))] | @tsv' "$JSON_PATH" | \
+          while IFS=$'\t' read -r id name email age active roles; do
+            TABLE+="<tr><td>$id</td><td>$name</td><td>$email</td><td>$age</td><td>$active</td><td>$roles</td></tr>"
+          done
+
+          TABLE+="</table>"
+
+          echo "PAGE_CONTENT<<EOF" >> $GITHUB_ENV
+          echo "$TABLE" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
       - name: Get current Confluence page info
         id: get_page
         run: |
@@ -50,11 +72,8 @@ jobs:
       - name: Prepare new content and payload
         id: prepare_payload
         run: |
-          # You can replace or append. Here, let's replace content fully with JSON file content:
-          NEW_CONTENT=$(echo "$PAGE_CONTENT" | jq -r '.')  # unescape JSON string to raw string
-
-          # Or to append:
-          # NEW_CONTENT="${OLD_CONTENT}<p><br/></p>${PAGE_CONTENT}"
+          # You can replace or append. Here, let's replace content fully with table:
+          NEW_CONTENT="$PAGE_CONTENT"
 
           # Build JSON payload for Confluence
           PAYLOAD=$(jq -n \
