@@ -35,7 +35,7 @@ jobs:
         id: json_to_table
         run: |
           echo "<table><tr><th>ID</th><th>Name</th><th>Email</th><th>Age</th><th>Active</th><th>Roles</th></tr>" > table.html
-          jq -r '.users[] | "<tr><td>\(.id)</td><td>\(.name)</td><td>\(.email)</td><td>\(.age)</td><td>\(.isActive)</td><td>\(.roles | join(\", \"))</td></tr>"' pages/Test.json >> table.html
+          jq -r '.users[] | "<tr><td>\(.id)</td><td>\(.name)</td><td>\(.email)</td><td>\(.age)</td><td>\(.isActive)</td><td>\(.roles | join(", "))</td></tr>"' pages/Test.json >> table.html
           echo "</table>" >> table.html
           {
             echo "TABLE_HTML<<EOF"
