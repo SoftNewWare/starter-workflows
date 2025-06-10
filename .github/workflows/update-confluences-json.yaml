@@ -60,27 +60,38 @@ jobs:
 
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Build payload with HTML table
+      - name: Build payload with HTML table (Python)
         run: |
-          jq -n \
-            --arg id "$PAGE_ID" \
-            --arg title "$PAGE_TITLE" \
-            --arg space_key "$SPACE_KEY" \
-            --argjson version $((VERSION + 1)) \
-            --arg value "$(cat table.html)" \
-            '{
-              id: $id,
-              type: "page",
-              title: $title,
-              space: { key: $space_key },
-              version: { number: $version },
-              body: {
-                storage: {
-                  value: $value,
-                  representation: "storage"
-                }
+          python3 <<EOF
+          import json
+          import os
+
+          page_id = os.environ["PAGE_ID"]
+          page_title = os.environ["PAGE_TITLE"]
+          space_key = os.environ["SPACE_KEY"]
+          version = int(os.environ["VERSION"])
+
+          with open("table.html", "r", encoding="utf-8") as f:
+              html_content = f.read()
+
+          payload = {
+              "id": page_id,
+              "type": "page",
+              "title": page_title,
+              "space": {"key": space_key},
+              "version": {"number": version + 1},
+              "body": {
+                  "storage": {
+                      "value": html_content,
+                      "representation": "storage"
+                  }
               }
-            }' > payload.json
+          }
+
+          with open("payload.json", "w", encoding="utf-8") as f:
+              json.dump(payload, f)
+          EOF
+
 
 
       - name: Update Confluence page
