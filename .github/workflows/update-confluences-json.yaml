@@ -62,17 +62,12 @@ jobs:
 
       - name: Build payload with HTML table
         run: |
-          NEW_CONTENT=$(cat table.html)
-
-          # Escape newlines and double quotes for safe JSON
-          ESCAPED_CONTENT=$(jq -Rs . <<< "$NEW_CONTENT")
-
           jq -n \
             --arg id "$PAGE_ID" \
             --arg title "$PAGE_TITLE" \
             --arg space_key "$SPACE_KEY" \
             --argjson version $((VERSION + 1)) \
-            --arg value "$NEW_CONTENT" \
+            --arg value "$(cat table.html)" \
             '{
               id: $id,
               type: "page",
@@ -86,6 +81,7 @@ jobs:
                 }
               }
             }' > payload.json
+
 
       - name: Update Confluence page
         run: |
