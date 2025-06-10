@@ -25,20 +25,28 @@ jobs:
           echo "Contents of pages directory:"
           ls -l pages
 
-      - name: Convert JSON to HTML table
-        id: json_to_table
+      - name: Convert JSON to HTML Table using Python
         run: |
-          echo "<table><tr><th>ID</th><th>Name</th><th>Email</th><th>Age</th><th>Active</th><th>Roles</th></tr>" > table.html
+          python3 <<EOF
+          import json
 
-          jq -r '.users[] | "<tr><td>\(.id)</td><td>\(.name)</td><td>\(.email)</td><td>\(.age)</td><td>\(.isActive)</td><td>\(.roles | join(", "))</td></tr>"' pages/Test.json >> table.html
+          with open("pages/Test.json") as f:
+              data = json.load(f)
 
-          echo "</table>" >> table.html
+          users = data.get("users", [])
 
-          # Safely export multi-line HTML into env var
-          echo "TABLE_HTML<<EOF" >> $GITHUB_ENV
-          cat table.html >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          html = ['<table border="1">']
+          html.append("<tr><th>ID</th><th>Name</th><th>Email</th><th>Age</th><th>Active</th><th>Roles</th></tr>")
+          for user in users:
+              html.append(
+                  f"<tr><td>{user['id']}</td><td>{user['name']}</td><td>{user['email']}</td>"
+                  f"<td>{user['age']}</td><td>{str(user['isActive']).lower()}</td><td>{', '.join(user['roles'])}</td></tr>"
+              )
+          html.append("</table>")
 
+          with open("table.html", "w") as f:
+              f.write('\n'.join(html))
+          EOF
 
       - name: Get current Confluence page info
         id: get_page
@@ -47,16 +55,19 @@ jobs:
             "$CONFLUENCE_URL/rest/api/content/$PAGE_ID?expand=body.storage,version")
           echo "$RESPONSE" > page.json
 
-          # Extract current version
+          OLD_CONTENT=$(jq -r '.body.storage.value' page.json)
           VERSION=$(jq '.version.number' page.json)
+
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Prepare new payload with HTML table
-        id: prepare_payload
+      - name: Build payload with HTML table
         run: |
-          NEW_CONTENT="${TABLE_HTML}"
+          NEW_CONTENT=$(cat table.html)
 
-          PAYLOAD=$(jq -n \
+          # Escape newlines and double quotes for safe JSON
+          ESCAPED_CONTENT=$(jq -Rs . <<< "$NEW_CONTENT")
+
+          jq -n \
             --arg id "$PAGE_ID" \
             --arg title "$PAGE_TITLE" \
             --arg space_key "$SPACE_KEY" \
@@ -74,9 +85,7 @@ jobs:
                   representation: "storage"
                 }
               }
-            }')
-
-          echo "$PAYLOAD" > payload.json
+            }' > payload.json
 
       - name: Update Confluence page
         run: |
