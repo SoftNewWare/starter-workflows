@@ -45,29 +45,23 @@ jobs:
 
           all_data = []
 
-          json_files = glob("pages/newFolders/*.json", recursive=True)
-
-          if not json_files:
-              print("No JSON files found.")
-              exit(1)
-
-          print(f"Found {len(json_files)} JSON files.")
-
-          for file_path in json_files:
+          for file_path in glob("pages/**/*.json", recursive=True):
               try:
                   with open(file_path, encoding="utf-8") as f:
                       data = json.load(f)
-                      if isinstance(data, dict):
-                          all_data.append(data)
+                      if isinstance(data, dict) and "users" in data and isinstance(data["users"], list):
+                          all_data.extend(data["users"])
                       elif isinstance(data, list):
                           all_data.extend(data)
+                      elif isinstance(data, dict):
+                          all_data.append(data)
                       else:
-                          print(f"⚠️ Skipped unsupported format in {file_path}")
+                          print(f"⚠️ Skipped {file_path}, unsupported format.")
               except Exception as e:
-                  print(f"⚠️ Failed to load {file_path}: {e}")
+                  print(f"⚠️ Failed to parse {file_path}: {e}")
 
           if not all_data:
-              print("❌ No valid data found in any JSON file.")
+              print("❌ No valid user data found.")
               exit(1)
 
           keys = sorted({key for row in all_data for key in row})
@@ -83,8 +77,9 @@ jobs:
           with open("table.html", "w", encoding="utf-8") as f:
               f.write("\n".join(html_lines))
 
-          print("✅ Merged table.html written.")
+          print("✅ table.html created with", len(all_data), "records.")
           EOF
+
 
 
 
