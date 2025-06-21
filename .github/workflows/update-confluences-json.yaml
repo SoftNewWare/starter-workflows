@@ -34,7 +34,6 @@ jobs:
           import json
           import html
           import os
-          from glob import glob
 
           def clean(val):
               if val is None:
@@ -45,18 +44,26 @@ jobs:
 
           all_data = []
 
-          for file_path in glob("pages/newFolders/*.json"):
-              with open(file_path, encoding="utf-8") as f:
+          with open("filelist.txt", "r", encoding="utf-8") as filelist:
+              for line in filelist:
+                  file_path = line.strip()
+                  if not file_path or not os.path.isfile(file_path):
+                      print(f"Skipping missing or empty path: {file_path}")
+                      continue
                   try:
-                      data = json.load(f)
-                      if isinstance(data, dict):
-                          all_data.append(data)
-                      elif isinstance(data, list):
-                          all_data.extend(data)
+                      with open(file_path, encoding="utf-8") as f:
+                          data = json.load(f)
+                          if isinstance(data, dict):
+                              all_data.append(data)
+                          elif isinstance(data, list):
+                              all_data.extend(data)
                   except Exception as e:
                       print(f"Failed to read {file_path}: {e}")
 
-          # Get all unique keys across all JSON objects
+          if not all_data:
+              raise ValueError("No data found to create the table.")
+
+          # Get all keys used in all rows
           keys = sorted({key for d in all_data for key in d.keys()})
 
           html_lines = ['<table border="1">']
@@ -70,6 +77,7 @@ jobs:
           with open("table.html", "w", encoding="utf-8") as f:
               f.write('\n'.join(html_lines))
           EOF
+
 
 
 
