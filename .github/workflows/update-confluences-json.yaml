@@ -2,6 +2,9 @@ name: Update Confluence Page from JSON File
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   update-confluence:
@@ -29,24 +32,46 @@ jobs:
         run: |
           python3 <<EOF
           import json
+          import html
+          import os
+          from glob import glob
 
-          with open("pages/Test.json") as f:
-              data = json.load(f)
+          def clean(val):
+              if val is None:
+                  return ""
+              if isinstance(val, str):
+                  return html.escape(val).replace("\\n", "<br>")
+              return html.escape(str(val))
 
-          users = data.get("users", [])
+          all_data = []
 
-          html = ['<table border="1">']
-          html.append("<tr><th>ID</th><th>Name</th><th>Email</th><th>Age</th><th>Active</th><th>Roles</th></tr>")
-          for user in users:
-              html.append(
-                  f"<tr><td>{user['id']}</td><td>{user['name']}</td><td>{user['email']}</td>"
-                  f"<td>{user['age']}</td><td>{str(user['isActive']).lower()}</td><td>{', '.join(user['roles'])}</td></tr>"
-              )
-          html.append("</table>")
+          for file_path in glob("pages/*.json"):
+              with open(file_path, encoding="utf-8") as f:
+                  try:
+                      data = json.load(f)
+                      if isinstance(data, dict):
+                          all_data.append(data)
+                      elif isinstance(data, list):
+                          all_data.extend(data)
+                  except Exception as e:
+                      print(f"Failed to read {file_path}: {e}")
 
-          with open("table.html", "w") as f:
-              f.write('\n'.join(html))
+          # Get all unique keys across all JSON objects
+          keys = sorted({key for d in all_data for key in d.keys()})
+
+          html_lines = ['<table border="1">']
+          html_lines.append("<tr>" + "".join(f"<th>{html.escape(key)}</th>" for key in keys) + "</tr>")
+
+          for row in all_data:
+              html_lines.append("<tr>" + "".join(f"<td>{clean(row.get(key))}</td>" for key in keys) + "</tr>")
+
+          html_lines.append("</table>")
+
+          with open("table.html", "w", encoding="utf-8") as f:
+              f.write('\n'.join(html_lines))
           EOF
+
+
 
       - name: Get current Confluence page info
         id: get_page
@@ -89,10 +114,8 @@ jobs:
           }
 
           with open("payload.json", "w", encoding="utf-8") as f:
-              json.dump(payload, f)
+              json.dump(payload, f, ensure_ascii=False, indent=2)
           EOF
-
-
 
       - name: Update Confluence page
         run: |
