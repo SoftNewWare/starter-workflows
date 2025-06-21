@@ -45,8 +45,12 @@ jobs:
 
           all_data = []
 
-          # Find all .json files inside pages/ recursively
           json_files = glob("pages/newFolders/*.json", recursive=True)
+
+          if not json_files:
+              print("No JSON files found.")
+              exit(1)
+
           print(f"Found {len(json_files)} JSON files.")
 
           for file_path in json_files:
@@ -57,14 +61,16 @@ jobs:
                           all_data.append(data)
                       elif isinstance(data, list):
                           all_data.extend(data)
+                      else:
+                          print(f"⚠️ Skipped unsupported format in {file_path}")
               except Exception as e:
-                  print(f"⚠️ Skipping {file_path}: {e}")
+                  print(f"⚠️ Failed to load {file_path}: {e}")
 
           if not all_data:
-              raise ValueError("❌ No JSON data found in any file under pages/.")
+              print("❌ No valid data found in any JSON file.")
+              exit(1)
 
-          # Collect all unique keys
-          keys = sorted({key for row in all_data for key in row.keys()})
+          keys = sorted({key for row in all_data for key in row})
 
           html_lines = ['<table border="1">']
           html_lines.append("<tr>" + "".join(f"<th>{html.escape(key)}</th>" for key in keys) + "</tr>")
@@ -75,10 +81,11 @@ jobs:
           html_lines.append("</table>")
 
           with open("table.html", "w", encoding="utf-8") as f:
-              f.write('\n'.join(html_lines))
+              f.write("\n".join(html_lines))
 
-          print("✅ table.html created with combined data from all JSONs.")
+          print("✅ Merged table.html written.")
           EOF
+
 
 
 
