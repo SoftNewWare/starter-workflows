@@ -45,7 +45,7 @@ jobs:
 
           all_data = []
 
-          for file_path in glob("pages/*.json"):
+          for file_path in glob("pages/newFolders/*.json"):
               with open(file_path, encoding="utf-8") as f:
                   try:
                       data = json.load(f)
